@@ -318,8 +318,8 @@ const RUNTIME_SCRIPT = `
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (target.closest("#astermode-trigger, #astermode-panel, #astermode-tooltip, #astermode-class-context")) return;
-    target.style.outline = "3px solid #22c55e";
 
+    target.style.outline = "3px solid #22c55e";
     const rect = target.getBoundingClientRect();
     state.tooltip.textContent = "W: " + rect.width.toFixed(1) + "px | H: " + rect.height.toFixed(1) + "px";
     state.tooltip.style.display = "block";
@@ -464,6 +464,120 @@ const RUNTIME_SCRIPT = `
     brandLabel.style.borderRight = "1px solid #e5e7eb";
     brandLabel.innerHTML = getAsterIconSvg("#16a34a") + "<span>AsterMode</span>";
 
+    const hoverToggleButton = document.createElement("button");
+    styleActionButton(hoverToggleButton);
+    hoverToggleButton.dataset.role = "hover";
+    updateHoverButtonLabel(hoverToggleButton);
+    hoverToggleButton.addEventListener("click", () => {
+      state.hoverEnabled = !state.hoverEnabled;
+      if (state.hoverEnabled) {
+        enableHoverEffect();
+      } else {
+        disableHoverEffect();
+      }
+      updateHoverButtonLabel(hoverToggleButton);
+    });
+
+    const clearStorageButton = document.createElement("button");
+    styleActionButton(clearStorageButton);
+    clearStorageButton.textContent = "LocalStorage";
+    clearStorageButton.addEventListener("click", () => {
+      localStorage.clear();
+      clearStorageButton.textContent = "Done: LocalStorage";
+      window.setTimeout(() => {
+        clearStorageButton.textContent = "LocalStorage";
+      }, 1000);
+    });
+
+    panelBody.appendChild(brandLabel);
+    panelBody.appendChild(hoverToggleButton);
+    panelBody.appendChild(clearStorageButton);
+
+    const clearSessionStorageButton = document.createElement("button");
+    styleActionButton(clearSessionStorageButton);
+    clearSessionStorageButton.textContent = "SessionStorage";
+    clearSessionStorageButton.addEventListener("click", () => {
+      sessionStorage.clear();
+      clearSessionStorageButton.textContent = "Done: SessionStorage";
+      window.setTimeout(() => {
+        clearSessionStorageButton.textContent = "SessionStorage";
+      }, 1000);
+    });
+
+    const clearCookiesButton = document.createElement("button");
+    styleActionButton(clearCookiesButton);
+    clearCookiesButton.textContent = "Clear Cookies";
+    clearCookiesButton.addEventListener("click", () => {
+      const cookies = document.cookie.split(";");
+      for (const cookie of cookies) {
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+        if (!name) continue;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      }
+      clearCookiesButton.textContent = "Done: Clear Cookies";
+      window.setTimeout(() => {
+        clearCookiesButton.textContent = "Clear Cookies";
+      }, 1000);
+    });
+
+    const cacheToggleButton = document.createElement("button");
+    styleActionButton(cacheToggleButton);
+    cacheToggleButton.dataset.role = "cache";
+    updateCacheButtonLabel(cacheToggleButton);
+    cacheToggleButton.addEventListener("click", () => {
+      setCacheDisabled(!state.cacheDisabled);
+      updateCacheButtonLabel(cacheToggleButton);
+    });
+
+    panelBody.appendChild(clearSessionStorageButton);
+    panelBody.appendChild(clearCookiesButton);
+    panelBody.appendChild(cacheToggleButton);
+
+    const reloadButton = document.createElement("button");
+    styleActionButton(reloadButton);
+    reloadButton.textContent = "Reload";
+    reloadButton.addEventListener("click", () => {
+      window.location.reload();
+    });
+
+    const closeButton = document.createElement("button");
+    styleActionButton(closeButton);
+    closeButton.textContent = "Close";
+    closeButton.addEventListener("click", () => {
+      hidePanel();
+    });
+
+    const themeButton = document.createElement("button");
+    styleActionButton(themeButton);
+    themeButton.dataset.role = "theme";
+    state.themeButton = themeButton;
+    themeButton.addEventListener("click", () => {
+      state.themeMode = state.isDarkTheme ? "light" : "dark";
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, state.themeMode);
+      } catch (error) {
+        // Ignore storage errors in restricted contexts.
+      }
+      applyThemeStyles();
+    });
+
+    panelBody.appendChild(reloadButton);
+    panelBody.appendChild(themeButton);
+    panelBody.appendChild(closeButton);
+    closeButton.style.borderRight = "0";
+    state.panel.appendChild(panelBody);
+    state.actionButtons = [
+      hoverToggleButton,
+      clearStorageButton,
+      clearSessionStorageButton,
+      clearCookiesButton,
+      cacheToggleButton,
+      reloadButton,
+      themeButton,
+      closeButton
+    ];
+
     state.tooltip = document.createElement("div");
     state.tooltip.id = "astermode-tooltip";
     state.tooltip.style.position = "absolute";
@@ -523,119 +637,6 @@ const RUNTIME_SCRIPT = `
       if (action === "cancel" || action === "close") hideClassContextBox();
     });
 
-    const hoverToggleButton = document.createElement("button");
-    styleActionButton(hoverToggleButton);
-    hoverToggleButton.dataset.role = "hover";
-    updateHoverButtonLabel(hoverToggleButton);
-    hoverToggleButton.addEventListener("click", () => {
-      state.hoverEnabled = !state.hoverEnabled;
-      if (state.hoverEnabled) {
-        enableHoverEffect();
-      } else {
-        disableHoverEffect();
-      }
-      updateHoverButtonLabel(hoverToggleButton);
-    });
-
-    const clearStorageButton = document.createElement("button");
-    styleActionButton(clearStorageButton);
-    clearStorageButton.textContent = "LocalStorage";
-    clearStorageButton.addEventListener("click", () => {
-      localStorage.clear();
-      clearStorageButton.textContent = "Done: LocalStorage";
-      window.setTimeout(() => {
-        clearStorageButton.textContent = "LocalStorage";
-      }, 1000);
-    });
-
-    const clearSessionStorageButton = document.createElement("button");
-    styleActionButton(clearSessionStorageButton);
-    clearSessionStorageButton.textContent = "SessionStorage";
-    clearSessionStorageButton.addEventListener("click", () => {
-      sessionStorage.clear();
-      clearSessionStorageButton.textContent = "Done: SessionStorage";
-      window.setTimeout(() => {
-        clearSessionStorageButton.textContent = "SessionStorage";
-      }, 1000);
-    });
-
-    const clearCookiesButton = document.createElement("button");
-    styleActionButton(clearCookiesButton);
-    clearCookiesButton.textContent = "Clear Cookies";
-    clearCookiesButton.addEventListener("click", () => {
-      const cookies = document.cookie.split(";");
-      for (const cookie of cookies) {
-        const eqPos = cookie.indexOf("=");
-        const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
-        if (!name) continue;
-        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-      }
-      clearCookiesButton.textContent = "Done: Clear Cookies";
-      window.setTimeout(() => {
-        clearCookiesButton.textContent = "Clear Cookies";
-      }, 1000);
-    });
-
-    const cacheToggleButton = document.createElement("button");
-    styleActionButton(cacheToggleButton);
-    cacheToggleButton.dataset.role = "cache";
-    updateCacheButtonLabel(cacheToggleButton);
-    cacheToggleButton.addEventListener("click", () => {
-      setCacheDisabled(!state.cacheDisabled);
-      updateCacheButtonLabel(cacheToggleButton);
-    });
-
-    panelBody.appendChild(brandLabel);
-    panelBody.appendChild(hoverToggleButton);
-    panelBody.appendChild(clearStorageButton);
-    panelBody.appendChild(clearSessionStorageButton);
-    panelBody.appendChild(clearCookiesButton);
-    panelBody.appendChild(cacheToggleButton);
-
-    const reloadButton = document.createElement("button");
-    styleActionButton(reloadButton);
-    reloadButton.textContent = "Reload";
-    reloadButton.addEventListener("click", () => {
-      window.location.reload();
-    });
-
-    const closeButton = document.createElement("button");
-    styleActionButton(closeButton);
-    closeButton.textContent = "Close";
-    closeButton.addEventListener("click", () => {
-      hidePanel();
-    });
-
-    const themeButton = document.createElement("button");
-    styleActionButton(themeButton);
-    themeButton.dataset.role = "theme";
-    state.themeButton = themeButton;
-    themeButton.addEventListener("click", () => {
-      state.themeMode = state.isDarkTheme ? "light" : "dark";
-      try {
-        localStorage.setItem(THEME_STORAGE_KEY, state.themeMode);
-      } catch (error) {
-        // Ignore storage errors in restricted contexts.
-      }
-      applyThemeStyles();
-    });
-
-    panelBody.appendChild(reloadButton);
-    panelBody.appendChild(themeButton);
-    panelBody.appendChild(closeButton);
-    closeButton.style.borderRight = "0";
-    state.panel.appendChild(panelBody);
-    state.actionButtons = [
-      hoverToggleButton,
-      clearStorageButton,
-      clearSessionStorageButton,
-      clearCookiesButton,
-      cacheToggleButton,
-      reloadButton,
-      themeButton,
-      closeButton
-    ];
-
     host.appendChild(state.trigger);
     host.appendChild(state.panel);
     host.appendChild(state.tooltip);
@@ -689,12 +690,36 @@ const RUNTIME_SCRIPT = `
 })();
 `;
 
-/**
- * Vite plugin that injects AsterMode into dev HTML.
- * @param {{ enabled?: boolean, cacheBypassDefault?: boolean }} options
- * @returns {import("vite").Plugin}
- */
-export default function astermode(options = {}) {
+export interface AsterModeOptions {
+  enabled?: boolean;
+  cacheBypassDefault?: boolean;
+}
+
+interface ViteConfigResolved {
+  command: "build" | "serve";
+}
+
+interface HtmlTagDescriptor {
+  tag: string;
+  attrs?: Record<string, string>;
+  children?: string;
+  injectTo?: "head" | "body" | "head-prepend" | "body-prepend";
+}
+
+interface TransformIndexHtmlResult {
+  html: string;
+  tags: HtmlTagDescriptor[];
+}
+
+export interface VitePluginLike {
+  name: string;
+  apply?: "serve" | "build";
+  enforce?: "pre" | "post";
+  configResolved?: (config: ViteConfigResolved) => void;
+  transformIndexHtml?: (html: string) => string | TransformIndexHtmlResult;
+}
+
+export default function astermode(options: AsterModeOptions = {}): VitePluginLike {
   const { enabled = true, cacheBypassDefault = false } = options;
   let isServe = false;
 
@@ -702,10 +727,10 @@ export default function astermode(options = {}) {
     name: "astermode",
     apply: "serve",
     enforce: "post",
-    configResolved(config) {
+    configResolved(config: ViteConfigResolved) {
       isServe = config.command === "serve";
     },
-    transformIndexHtml(html) {
+    transformIndexHtml(html: string): string | TransformIndexHtmlResult {
       if (!enabled || !isServe) {
         return html;
       }

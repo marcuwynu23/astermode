@@ -1,0 +1,37 @@
+{
+  "name": "astermode",
+  "version": "0.1.0",
+  "description": "A Vite plugin that injects a draggable Dev Mode overlay during development.",
+  "type": "module",
+  "main": "./src/astermode.js",
+  "module": "./src/astermode.js",
+  "types": "./src/astermode.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/astermode.d.ts",
+      "import": "./src/astermode.js",
+      "default": "./src/astermode.js"
+    }
+  },
+  "files": [
+    "src/astermode.js",
+    "src/astermode.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "devtools",
+    "overlay",
+    "frontend"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "vite": ">=5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
