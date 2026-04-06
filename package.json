@@ -30,7 +30,11 @@
     "overlay",
     "frontend"
   ],
-  "author": "",
+  "author": "Mark Wayne Menorca",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcuwynu23/AsterMode.git"
+  },
   "license": "MIT",
   "peerDependencies": {
     "vite": ">=5.0.0"
