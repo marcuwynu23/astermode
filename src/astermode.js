@@ -149,7 +149,7 @@ const RUNTIME_SCRIPT = `
     if (!state.panel || !state.trigger) return;
     const nextOpen = typeof forceOpen === "boolean" ? forceOpen : state.panel.style.display === "none";
     state.panel.style.display = nextOpen ? "block" : "none";
-    state.trigger.style.display = "inline-flex";
+    state.trigger.style.display = nextOpen ? "none" : "inline-flex";
     try {
       localStorage.setItem(PANEL_OPEN_STORAGE_KEY, nextOpen ? "1" : "0");
     } catch (error) {
@@ -579,8 +579,8 @@ const RUNTIME_SCRIPT = `
     state.trigger.style.position = "fixed";
     state.trigger.style.left = "16px";
     state.trigger.style.bottom = "16px";
-    state.trigger.style.width = "52px";
-    state.trigger.style.height = "52px";
+    state.trigger.style.width = "44px";
+    state.trigger.style.height = "44px";
     state.trigger.style.borderRadius = "999px";
     state.trigger.style.border = "2px solid #16a34a";
     state.trigger.style.background = "linear-gradient(145deg, #22c55e 0%, #16a34a 100%)";
