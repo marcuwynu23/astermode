@@ -20,6 +20,9 @@ const RUNTIME_SCRIPT = `
     themeButton: null,
     themeMode: "auto",
     isDarkTheme: false,
+    cmView: null,
+    cmModules: null,
+    usingThirdPartyEditor: false,
     originalFetch: null,
     originalOpen: null,
     handlers: {}
@@ -76,11 +79,77 @@ const RUNTIME_SCRIPT = `
     state.themeButton.textContent = "Theme: " + (state.isDarkTheme ? "Dark" : "Light");
   }
 
+  async function ensureCodeMirrorModules() {
+    if (state.cmModules) return state.cmModules;
+    const [cm, statePkg, viewPkg, htmlPkg, darkPkg] = await Promise.all([
+      import("https://esm.sh/codemirror@6.0.1"),
+      import("https://esm.sh/@codemirror/state@6.4.1"),
+      import("https://esm.sh/@codemirror/view@6.30.1"),
+      import("https://esm.sh/@codemirror/lang-html@6.4.9"),
+      import("https://esm.sh/@codemirror/theme-one-dark@6.1.2")
+    ]);
+    state.cmModules = { ...cm, ...statePkg, ...viewPkg, ...htmlPkg, ...darkPkg };
+    return state.cmModules;
+  }
+
+  function getCodeEditorThemeExtension(cmModules, isDark) {
+    if (isDark && cmModules.oneDark) return cmModules.oneDark;
+    if (!isDark && cmModules.EditorView && cmModules.EditorView.theme) {
+      return cmModules.EditorView.theme({
+        "&": { backgroundColor: "#f8fafc", color: "#0f172a" },
+        ".cm-content": { caretColor: "#0f172a" },
+        "&.cm-focused .cm-cursor": { borderLeftColor: "#0f172a" },
+        "&.cm-focused .cm-selectionBackground, ::selection": { backgroundColor: "#dbeafe" },
+        ".cm-gutters": { backgroundColor: "#f1f5f9", color: "#64748b", border: "none" }
+      });
+    }
+    return [];
+  }
+
+  function destroyCodeMirrorInstance() {
+    if (state.cmView && state.cmView.destroy) {
+      state.cmView.destroy();
+    }
+    state.cmView = null;
+  }
+
+  async function mountThirdPartyEditor(source) {
+    if (!state.classContextBox) return false;
+    const host = state.classContextBox.querySelector('[data-role="code-editor-host"]');
+    const fallback = state.classContextBox.querySelector('[data-role="code-editor-fallback"]');
+    if (!(host instanceof HTMLElement) || !(fallback instanceof HTMLTextAreaElement)) return false;
+    try {
+      const cmModules = await ensureCodeMirrorModules();
+      destroyCodeMirrorInstance();
+      host.innerHTML = "";
+      const startDoc = typeof source === "string" ? source : "";
+      const extensions = [
+        cmModules.basicSetup,
+        cmModules.html(),
+        cmModules.EditorView.lineWrapping,
+        getCodeEditorThemeExtension(cmModules, state.isDarkTheme)
+      ];
+      state.cmView = new cmModules.EditorView({
+        state: cmModules.EditorState.create({ doc: startDoc, extensions }),
+        parent: host
+      });
+      fallback.style.display = "none";
+      host.style.display = "block";
+      state.usingThirdPartyEditor = true;
+      return true;
+    } catch (error) {
+      host.style.display = "none";
+      fallback.style.display = "block";
+      state.usingThirdPartyEditor = false;
+      return false;
+    }
+  }
+
   function togglePanel(forceOpen) {
     if (!state.panel || !state.trigger) return;
     const nextOpen = typeof forceOpen === "boolean" ? forceOpen : state.panel.style.display === "none";
     state.panel.style.display = nextOpen ? "block" : "none";
-    state.trigger.style.display = nextOpen ? "none" : "inline-flex";
+    state.trigger.style.display = "inline-flex";
     try {
       localStorage.setItem(PANEL_OPEN_STORAGE_KEY, nextOpen ? "1" : "0");
     } catch (error) {
@@ -101,12 +170,13 @@ const RUNTIME_SCRIPT = `
 
   function openHtmlEditorForElement(target, x, y) {
     if (!state.classContextBox) return;
-    const editor = state.classContextBox.querySelector('[data-role="code-editor"]');
+    const editor = state.classContextBox.querySelector('[data-role="code-editor-host"]');
     const applyButton = state.classContextBox.querySelector('button[data-action="apply"]');
     if (!(editor instanceof HTMLElement) || !(applyButton instanceof HTMLButtonElement)) return;
 
     state.selectedElement = target;
-    setEditorCodeText(target.innerHTML);
+    const formattedHtml = formatHtml(target.outerHTML);
+    setEditorCodeText(formattedHtml);
     applyButton.textContent = "Apply";
     state.classContextBox.style.display = "block";
     const boxWidth = Math.min(560, window.innerWidth - 24);
@@ -115,19 +185,87 @@ const RUNTIME_SCRIPT = `
     const nextTop = Math.max(12, Math.min(y + 8, window.innerHeight - estimatedHeight - 12));
     state.classContextBox.style.left = nextLeft + "px";
     state.classContextBox.style.top = nextTop + "px";
+    mountThirdPartyEditor(formattedHtml);
   }
 
   function applyHtmlEdit() {
     if (!state.classContextBox || !(state.selectedElement instanceof HTMLElement)) return;
-    const editor = state.classContextBox.querySelector('[data-role="code-editor"]');
+    const editor = state.classContextBox.querySelector('[data-role="code-editor-host"]');
     const applyButton = state.classContextBox.querySelector('button[data-action="apply"]');
     if (!(editor instanceof HTMLElement) || !(applyButton instanceof HTMLButtonElement)) return;
 
-    state.selectedElement.innerHTML = getEditorCodeText();
+    const updatedMarkup = getEditorCodeText().trim();
+    if (!updatedMarkup) return;
+    const template = document.createElement("template");
+    template.innerHTML = updatedMarkup;
+    if (!template.content.firstChild) return;
+
+    const marker = document.createComment("astermode-edit-replace");
+    state.selectedElement.replaceWith(marker);
+    marker.replaceWith(template.content.cloneNode(true));
+    state.selectedElement = null;
     applyButton.textContent = "Applied";
     window.setTimeout(() => {
       applyButton.textContent = "Apply";
     }, 700);
+  }
+
+  function formatHtml(source) {
+    const template = document.createElement("template");
+    template.innerHTML = source.trim();
+    const lines = [];
+
+    function serializeNode(node, depth) {
+      const indent = "  ".repeat(depth);
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = (node.textContent || "").trim();
+        if (text) lines.push(indent + text);
+        return;
+      }
+
+      if (node.nodeType === Node.COMMENT_NODE) {
+        lines.push(indent + "<!--" + (node.textContent || "") + "-->");
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const element = node;
+      const tag = element.tagName.toLowerCase();
+      const attrs = Array.from(element.attributes)
+        .map((attr) => attr.name + '="' + attr.value.replace(/"/g, "&quot;") + '"')
+        .join(" ");
+      const openTag = attrs ? "<" + tag + " " + attrs + ">" : "<" + tag + ">";
+
+      const children = Array.from(element.childNodes).filter((child) => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          return (child.textContent || "").trim().length > 0;
+        }
+        return true;
+      });
+
+      if (children.length === 0) {
+        lines.push(indent + openTag + "</" + tag + ">");
+        return;
+      }
+
+      if (children.length === 1 && children[0].nodeType === Node.TEXT_NODE) {
+        lines.push(indent + openTag + (children[0].textContent || "").trim() + "</" + tag + ">");
+        return;
+      }
+
+      lines.push(indent + openTag);
+      for (const child of children) {
+        serializeNode(child, depth + 1);
+      }
+      lines.push(indent + "</" + tag + ">");
+    }
+
+    for (const child of Array.from(template.content.childNodes)) {
+      serializeNode(child, 0);
+    }
+
+    return lines.join("\\n");
   }
 
   function escapeHtml(value) {
@@ -147,15 +285,36 @@ const RUNTIME_SCRIPT = `
 
   function setEditorCodeText(source) {
     if (!state.classContextBox) return;
-    const editor = state.classContextBox.querySelector('[data-role="code-editor"]');
-    if (!(editor instanceof HTMLElement)) return;
-    editor.dataset.raw = source;
-    editor.innerHTML = highlightHtmlCode(source);
+    if (state.cmView && state.cmModules && state.cmModules.EditorSelection) {
+      const length = state.cmView.state.doc.length;
+      state.cmView.dispatch({
+        changes: { from: 0, to: length, insert: source },
+        selection: state.cmModules.EditorSelection.cursor(source.length)
+      });
+      return;
+    }
+    const fallback = state.classContextBox.querySelector('[data-role="code-editor-fallback"]');
+    if (fallback instanceof HTMLTextAreaElement) {
+      fallback.value = source;
+      return;
+    }
+    const editor = state.classContextBox.querySelector('[data-role="code-editor-host"]');
+    if (editor instanceof HTMLElement) {
+      editor.dataset.raw = source;
+      editor.innerHTML = highlightHtmlCode(source);
+    }
   }
 
   function getEditorCodeText() {
     if (!state.classContextBox) return "";
-    const editor = state.classContextBox.querySelector('[data-role="code-editor"]');
+    if (state.cmView) {
+      return state.cmView.state.doc.toString();
+    }
+    const fallback = state.classContextBox.querySelector('[data-role="code-editor-fallback"]');
+    if (fallback instanceof HTMLTextAreaElement) {
+      return fallback.value;
+    }
+    const editor = state.classContextBox.querySelector('[data-role="code-editor-host"]');
     if (!(editor instanceof HTMLElement)) return "";
     return editor.dataset.raw || editor.textContent || "";
   }
@@ -220,7 +379,7 @@ const RUNTIME_SCRIPT = `
       button.style.borderRight = "1px solid " + buttonBorder;
     }
 
-    const brand = state.panel?.querySelector('[data-role="brand"]');
+    const brand = state.panel ? state.panel.querySelector('[data-role="brand"]') : null;
     if (brand instanceof HTMLElement) {
       brand.style.color = textColor;
       brand.style.borderRight = "1px solid " + buttonBorder;
@@ -231,7 +390,8 @@ const RUNTIME_SCRIPT = `
       state.classContextBox.style.color = textColor;
       state.classContextBox.style.border = "1px solid " + (isDark ? "#334155" : "#dbe3ee");
 
-      const editor = state.classContextBox.querySelector('[data-role="code-editor"]');
+      const editor = state.classContextBox.querySelector('[data-role="code-editor-host"]');
+      const fallback = state.classContextBox.querySelector('[data-role="code-editor-fallback"]');
       const closeTop = state.classContextBox.querySelector('button[data-action="close"]');
       const cancel = state.classContextBox.querySelector('button[data-action="cancel"]');
       const apply = state.classContextBox.querySelector('button[data-action="apply"]');
@@ -240,6 +400,11 @@ const RUNTIME_SCRIPT = `
         editor.style.background = isDark ? "#111827" : "#f8fafc";
         editor.style.color = isDark ? "#e5e7eb" : "#0f172a";
         editor.style.border = "1px solid " + (isDark ? "#334155" : "#dbe3ee");
+      }
+      if (fallback instanceof HTMLTextAreaElement) {
+        fallback.style.background = isDark ? "#111827" : "#f8fafc";
+        fallback.style.color = isDark ? "#e5e7eb" : "#0f172a";
+        fallback.style.border = "1px solid " + (isDark ? "#334155" : "#dbe3ee");
       }
       for (const actionButton of [closeTop, cancel]) {
         if (actionButton instanceof HTMLButtonElement) {
@@ -253,10 +418,14 @@ const RUNTIME_SCRIPT = `
         apply.style.color = "#ffffff";
         apply.style.border = "1px solid #16a34a";
       }
+      if (state.cmView) {
+        const current = state.cmView.state.doc.toString();
+        mountThirdPartyEditor(current);
+      }
     }
 
-    const hoverButton = state.actionButtons.find((button) => button?.dataset?.role === "hover");
-    const cacheButton = state.actionButtons.find((button) => button?.dataset?.role === "cache");
+    const hoverButton = state.actionButtons.find((button) => button && button.dataset && button.dataset.role === "hover");
+    const cacheButton = state.actionButtons.find((button) => button && button.dataset && button.dataset.role === "cache");
     updateHoverButtonLabel(hoverButton);
     updateCacheButtonLabel(cacheButton);
     updateThemeButtonLabel();
@@ -319,7 +488,7 @@ const RUNTIME_SCRIPT = `
     if (!(target instanceof HTMLElement)) return;
     if (target.closest("#astermode-trigger, #astermode-panel, #astermode-tooltip, #astermode-class-context")) return;
 
-    target.style.outline = "3px solid #22c55e";
+    target.style.outline = "1px solid #22c55e";
     const rect = target.getBoundingClientRect();
     state.tooltip.textContent = "W: " + rect.width.toFixed(1) + "px | H: " + rect.height.toFixed(1) + "px";
     state.tooltip.style.display = "block";
@@ -348,7 +517,6 @@ const RUNTIME_SCRIPT = `
     document.body.removeEventListener("mouseover", state.handlers.addHoverEffect);
     document.body.removeEventListener("mouseout", state.handlers.removeHoverEffect);
     document.removeEventListener("contextmenu", state.handlers.onElementContextMenu);
-    hideClassContextBox();
   }
 
   function onElementContextMenu(event) {
@@ -367,8 +535,14 @@ const RUNTIME_SCRIPT = `
     const deltaX = event.clientX - state.startX;
     const deltaY = event.clientY - state.startY;
     if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) state.moved = true;
-    state.trigger.style.left = state.initialLeft + deltaX + "px";
-    state.trigger.style.bottom = state.initialBottom - deltaY + "px";
+    const nextLeft = state.initialLeft + deltaX;
+    const nextBottom = state.initialBottom - deltaY;
+    const triggerWidth = state.trigger.offsetWidth || 52;
+    const triggerHeight = state.trigger.offsetHeight || 52;
+    const clampedLeft = Math.max(0, Math.min(nextLeft, window.innerWidth - triggerWidth));
+    const clampedBottom = Math.max(0, Math.min(nextBottom, window.innerHeight - triggerHeight));
+    state.trigger.style.left = clampedLeft + "px";
+    state.trigger.style.bottom = clampedBottom + "px";
   }
 
   function onMouseUp() {
@@ -614,18 +788,23 @@ const RUNTIME_SCRIPT = `
       "</div>" +
       '<button data-action="close" type="button" style="border:1px solid #dbe3ee;border-radius:8px;background:#fff;color:#6b7280;cursor:pointer;font-size:12px;line-height:1;height:24px;padding:0 8px;">Close</button>' +
       "</div>" +
-      '<div data-role="code-editor" contenteditable="true" spellcheck="false" style="width:100%;min-height:180px;max-height:320px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #dbe3ee;border-radius:10px;padding:10px;background:#f8fafc;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;color:#0f172a;"></div>' +
+      '<div data-role="code-editor-host" style="width:100%;min-height:180px;max-height:320px;overflow:auto;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc;"></div>' +
+      '<textarea data-role="code-editor-fallback" spellcheck="false" style="display:none;width:100%;min-height:180px;max-height:320px;resize:vertical;overflow:auto;border:1px solid #dbe3ee;border-radius:10px;padding:10px;background:#f8fafc;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;color:#0f172a;"></textarea>' +
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">' +
       '<button data-action="apply" type="button" style="height:30px;border:1px solid #16a34a;border-radius:8px;background:#16a34a;color:#fff;padding:0 12px;cursor:pointer;font-weight:600;">Apply</button>' +
       '<button data-action="cancel" type="button" style="height:30px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;color:#374151;padding:0 12px;cursor:pointer;">Cancel</button>' +
       "</div>";
-    const codeEditor = state.classContextBox.querySelector('[data-role="code-editor"]');
-    if (codeEditor instanceof HTMLElement) {
-      codeEditor.addEventListener("input", refreshHighlightedEditorFromInput);
-      codeEditor.addEventListener("paste", (event) => {
+    const fallbackEditor = state.classContextBox.querySelector('[data-role="code-editor-fallback"]');
+    if (fallbackEditor instanceof HTMLTextAreaElement) {
+      fallbackEditor.addEventListener("input", () => setEditorCodeText(fallbackEditor.value));
+      fallbackEditor.addEventListener("paste", (event) => {
         event.preventDefault();
-        const text = event.clipboardData?.getData("text/plain") || "";
-        document.execCommand("insertText", false, text);
+        const text = (event.clipboardData && event.clipboardData.getData("text/plain")) || "";
+        const start = fallbackEditor.selectionStart != null ? fallbackEditor.selectionStart : 0;
+        const end = fallbackEditor.selectionEnd != null ? fallbackEditor.selectionEnd : 0;
+        const nextValue = fallbackEditor.value.slice(0, start) + text + fallbackEditor.value.slice(end);
+        fallbackEditor.value = nextValue;
+        fallbackEditor.selectionStart = fallbackEditor.selectionEnd = start + text.length;
       });
     }
     state.classContextBox.addEventListener("click", (event) => {
@@ -645,10 +824,8 @@ const RUNTIME_SCRIPT = `
     state.trigger.addEventListener("mousedown", state.handlers.onMouseDown);
     state.trigger.addEventListener("click", (event) => {
       event.stopPropagation();
-      hideClassContextBox();
       if (!state.moved) togglePanel(true);
     });
-    document.addEventListener("click", hideClassContextBox);
     setCacheDisabled(state.cacheDisabled);
     try {
       togglePanel(localStorage.getItem(PANEL_OPEN_STORAGE_KEY) === "1");
