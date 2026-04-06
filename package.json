@@ -1,6 +1,6 @@
 {
   "name": "astermode",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A Vite plugin that injects a draggable Dev Mode overlay during development.",
   "type": "module",
   "scripts": {
@@ -36,6 +36,9 @@
     "url": "https://github.com/marcuwynu23/AsterMode.git"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "vite": ">=5.0.0"
   },
