@@ -1,112 +1,103 @@
-# AsterMode 🌸
+<h1 align="center">AsterMode 🌸</h1>
 
-**AsterMode** is a lightweight JavaScript library for developers that provides a draggable "Dev Mode" indicator on your web page. The library helps to enable a development mode that overlays diagnostic tools, including hover border toggling and the ability to clear local storage directly from the page.
+<p align="center">
+  A lightweight Vite plugin that injects a draggable <strong>Dev Mode</strong> overlay for local debugging.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/astermode">
+    <img src="https://img.shields.io/npm/v/astermode?style=flat-square" alt="npm version" />
+  </a>
+  <a href="https://www.npmjs.com/package/astermode">
+    <img src="https://img.shields.io/npm/dm/astermode?style=flat-square" alt="npm downloads" />
+  </a>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
+  </a>
+  <img src="https://img.shields.io/badge/vite-plugin-646CFF?style=flat-square&logo=vite&logoColor=white" alt="vite plugin" />
+  <img src="https://img.shields.io/badge/dev-only-orange?style=flat-square" alt="dev only" />
+</p>
+
+## Overview
+
+`AsterMode` is designed for Vite development workflows. During `vite dev`, it injects a visual overlay to help with UI inspection and debugging. It does not run in production builds.
 
 ## Features
 
-- **Draggable "Dev Mode" Indicator**: A movable element to indicate "Dev Mode" is active.
-- **Context Menu**: Right-click or click on the indicator to access options like toggling hover borders and clearing local storage.
-- **Hover Borders**: Highlight elements with a red border on hover to visualize element boundaries.
-- **Dimension Tooltip**: Display the width and height of elements when hovering over them.
-- **Easy Setup and Usage**: Include the library via a CDN and enable or disable with a single function call.
+- Draggable **Dev Mode** indicator
+- Context menu actions:
+  - toggle hover borders
+  - clear local storage
+- Live element size tooltip (`width` and `height`)
+- Vite dev-only HTML injection (`serve` mode)
+- TypeScript-authored with compatibility for TS and JS consumers
 
 ## Installation
 
-You can include **AsterMode** in your project by adding the following script tag to your HTML file:
-
-```html
-<script src="https://cdn.example.com/astermode.js"></script>
+```bash
+npm install --save-dev astermode
 ```
 
-## Usage
+## Quick Start
 
-Once the library is included, you can enable or disable "Dev Mode" using the following JavaScript commands:
+### TypeScript (`vite.config.ts`)
 
-```javascript
-// Enable Dev Mode
-DevMode.enable();
+```ts
+import { defineConfig } from "vite";
+import astermode from "astermode";
 
-// Disable Dev Mode
-DevMode.disable();
+export default defineConfig({
+  plugins: [astermode()]
+});
 ```
 
-Example
-Here’s a simple HTML example that uses AsterMode:
+### JavaScript (`vite.config.js`)
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>AsterMode Example</title>
-		<script src="https://cdn.example.com/astermode.js"></script>
-	</head>
-	<body>
-		<div id="root">
-			<h1>Welcome to AsterMode!</h1>
-			<p>Hover over elements to see their dimensions.</p>
-		</div>
+```js
+import { defineConfig } from "vite";
+import astermode from "astermode";
 
-		<script>
-			// Enable Dev Mode on page load
-			DevMode.enable();
-		</script>
-	</body>
-</html>
+export default defineConfig({
+  plugins: [astermode()]
+});
 ```
 
-### Using AsterMode in a Vite or React App
+Run your app:
 
-If you're using AsterMode in a Vite or React application, you can conditionally enable "Dev Mode" based on an environment variable.
-
-1. Set Environment Variable: Create a .env file in the root of your Vite or React project and add the following line:
-
-For Vite:
-
-```sh
-VITE_APP_MODE=development
+```bash
+npm run dev
 ```
 
-For React App:
+## Configuration
 
-```sh
-REACT_APP_MODE=development
+`astermode` accepts a single options object:
+
+```ts
+astermode({
+  enabled: true
+});
 ```
 
-## Development
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `boolean` | `true` | Enables or disables overlay injection in dev mode. |
 
-If you want to contribute to AsterMode, follow these steps to set up your development environment:
+## Behavior Notes
 
-1. Clone the repository:
-
-```sh
-git clone https://github.com/yourusername/astermode.git
-cd astermode
-```
-
-2. Install dependencies (if applicable):
-
-```sh
-npm install
-
-```
-
-3. Run a development server:
-
-```sh
-npm start
-
-```
-
-## Contributing
-
-We welcome contributions! Please check out the contributing guidelines for more details.
+- Built specifically for Vite projects
+- Injected only in `serve` mode
+- Not intended as a CDN/global script include
 
 ## License
 
-AsterMode is licensed under the MIT License. See the LICENSE file for more information.
+MIT
 
-## Acknowledgements
+## Example (Vite + React)
 
-Inspired by the elegance and wisdom represented by the Aster flower in the language of flowers, this tool aims to bring clarity and simplicity to the development process.
+A runnable example is available in `examples/vite-react`.
+
+```bash
+cd examples/vite-react
+npm install
+npm run dev
+```
