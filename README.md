@@ -24,13 +24,30 @@
 
 ## Features
 
-- Draggable **Dev Mode** indicator
-- Context menu actions:
-  - toggle hover borders
-  - clear local storage
-- Live element size tooltip (`width` and `height`)
-- Vite dev-only HTML injection (`serve` mode)
-- TypeScript-authored with compatibility for TS and JS consumers
+- Floating, draggable **AsterMode** trigger button (clamped to viewport bounds)
+- Bottom dev toolbar with quick actions:
+  - Hover border toggle (`ON/OFF`)
+  - Clear `localStorage`
+  - Clear `sessionStorage`
+  - Clear cookies
+  - Cache toggle (`ON/OFF`) with request no-cache behavior
+  - Theme switch (`Light` / `Dark`)
+  - Reload page
+  - Close panel
+- Panel visibility state persistence across reloads (`localStorage`)
+- Hover inspection:
+  - element outline (1px)
+  - live width/height tooltip
+  - excludes AsterMode UI from hover targeting
+- Right-click element while hover mode is on:
+  - opens **Live HTML Editor** for the selected element
+  - loads full element markup (`outerHTML`, including container tag)
+  - formatted/indented HTML editing
+  - apply edits by replacing the selected node in-place
+- Built-in third-party HTML editor integration (CodeMirror) with textarea fallback
+- Theme-adaptive editor and toolbar styling (auto + manual theme mode)
+- Vite dev-only runtime injection (`apply: "serve"`)
+- TypeScript-authored with JS-compatible runtime and type declarations
 
 ## Installation
 
@@ -74,19 +91,24 @@ npm run dev
 
 ```ts
 astermode({
-  enabled: true
+  enabled: true,
+  cacheBypassDefault: false
 });
 ```
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Enables or disables overlay injection in dev mode. |
+| `cacheBypassDefault` | `boolean` | `false` | Starts AsterMode with cache bypass enabled (`Cache: OFF`). |
 
 ## Behavior Notes
 
 - Built specifically for Vite projects
 - Injected only in `serve` mode
 - Not intended as a CDN/global script include
+- UI state uses browser `localStorage` keys:
+  - `astermode:panel-open`
+  - `astermode:theme`
 
 ## License
 
