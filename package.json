@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "A Vite plugin that injects a draggable Dev Mode overlay during development.",
   "type": "module",
+  "scripts": {
+    "check:exports": "node --input-type=module -e \"import('./src/astermode.js').then((m)=>{if(typeof m.default!=='function') throw new Error('default export is not a function'); console.log('default export ok');})\"",
+    "pack:check": "npm pack --dry-run"
+  },
   "main": "./src/astermode.js",
   "module": "./src/astermode.js",
   "types": "./src/astermode.d.ts",
