@@ -25,14 +25,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Smoke check dist exports
-        run: node --input-type=module -e "import('./dist/index.js').then((m)=>{ if (typeof m.default !== 'function') throw new Error('default export is not a function'); console.log('default export ok'); })"
+      - name: Smoke check package export
+        run: npm run check:exports
 
   package:
     name: Package tarball
@@ -48,8 +42,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Dry-run pack
+        run: npm run pack:check
 
       - name: Pack
         run: npm pack
